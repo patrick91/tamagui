@@ -1,0 +1,45 @@
+---
+title: Tamagui 1
+publishedAt: '2022-04-23'
+description: Tamagui version 1 is out with a laundry list of improvements.
+by: nate
+---
+
+<Image title="Layout tools image" src="/social.jpg" size="hero" height={150} width={900} />
+
+<IntroParagraph>
+  Tamagui is a vertically integrated UI library and ecosystem of UI packages that unify React web
+  and React Native. Using the power of a build-time compiler that actually partially evaluates your
+  code, Tamagui greatly increases performance of a typical universal app, oftentimes even running
+  faster than purely web-focused style libraries.
+</IntroParagraph>
+
+Tamagui has come a long way. Before I recap all the features since the Beta release, I'm going to take a moment and try to explain _why_ I think Tamagui is a big step forward for sharing code between native and web.
+
+First, Tamagui solves a trilemma. In all my past apps, I've had to choose two:
+
+1. Runs on native and web (**Universal**)
+2. Runs well (**Performant**: outputs minimal, platform-specific code)
+3. Easy to develop (**DX**: DRY code, typed, and not overly verbose)
+
+Broken down:
+
+### Universal + DX
+
+If you want an app that run on native and web and is easy to develop, there are a few libraries that exist today. But you **will sacrifice performance in multiple dimensions, especially on the web**. Your beautifully typed theme tokens and fancy `css` prop or `styled()` component helpers ultimately are entirely JavaScript, and it's not just a little bit. They load more JS, but also do many things at runtime that will trigger full-page re-renders often: media queries, pseudo styles, and theme changes. No other Universal style system for React today lets you share components that fully support SSR, or extract CSS at build-time as Tamagui does.
+
+### Universal + Performance
+
+If you want to share code between native and web, and still have things run well on each, you need to find a way to to have all your styles run in CSS. That means all your styles - from shared colors and fonts, to media queries, pseudo styles, themes, and animations - must be accounted for. And each of these adds _a lot_ of overhead to your dev-time. You'll need to hand-roll forking logic that diverges from native to web for each. [...]
+
+### Performance + DX
+
+There's a final way we can get good performance and have pretty nice DX: write everything twice! You could likely design your repo so you share some design tokens and media queries, and with some effort you may even get those nicely typed between the two apps. This is a great option if you don't mind doubling your frontend overhead.
+
+## How to solve the Universal App Trilemma
+
+Web-focused style systems have come a long way in the last decade. Typed colors, tokens, fonts, shorthands, media queries and more all make for more consistent, easy to author designs. Variants are a nice way to define typed alternatives. And with a nice theme system, you can avoid having to double all your styles to support dark mode.
+
+There are some awesome libraries that have attempted to bring these same features to Native, and they've done a great job at achieving much of the ergonomics of the web-only ones. But in doing so, they bring along all of the surface area of React Native Web, plus all the code necessary to support all these nice features.
+
+Tamagui was designed from the start with this trilemma in mind - and it solves it by being designed to work alongside a custom compiler.
