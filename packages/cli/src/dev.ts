@@ -1,10 +1,9 @@
 import { AddressInfo } from 'net'
 import { join } from 'path'
 
-import { nativePlugin, tamaguiPlugin } from '@tamagui/vite-plugin'
 import chalk from 'chalk'
 import express from 'express'
-import proxy from 'express-http-proxy'
+// import proxy from 'express-http-proxy'
 import fs from 'fs-extra'
 import killPort from 'kill-port'
 import morgan from 'morgan'
@@ -19,6 +18,8 @@ export const dev = async (options: ResolvedOptions) => {
 
   process.chdir(process.cwd())
 
+  const { tamaguiPlugin, nativePlugin } = await import('@tamagui/vite-plugin')
+
   const plugins = [
     tamaguiPlugin({
       components: ['tamagui'],
@@ -26,15 +27,26 @@ export const dev = async (options: ResolvedOptions) => {
     nativePlugin(),
   ]
 
+  console.log('root', root)
+
   const buildOutput = await build({
     plugins,
-    root,
+    appType: 'custom',
+    root: join(root, 'src/index.ts'),
+    build: {
+      ssr: true,
+    },
+    ssr: {
+      format: 'cjs',
+      target: 'node',
+    },
   })
-  const outputJsFile = 'output' in buildOutput ? buildOutput.output[0]?.fileName : null
-  if (!outputJsFile) {
+  const outputCode = 'output' in buildOutput ? buildOutput.output[0].code : null
+
+  if (!outputCode) {
     throw new Error(`No js?`)
   }
-  const outputJsPath = join(process.cwd(), 'dist', outputJsFile)
+  const outputJsPath = join(process.cwd(), 'dist', outputCode)
 
   const server = await createServer({
     root,
@@ -88,11 +100,11 @@ export const dev = async (options: ResolvedOptions) => {
 
   // /index.bundle?platform=ios&dev=true&minify=false&modulesOnly=false&runModule=true&app=dish.motion:2811:36)
   app.get('/index.bundle', async (req, res) => {
-    const output = (await fs.readFile(outputJsPath)).toString()
+    // const output = (await fs.readFile(outputJsPath)).toString()
 
     res.status(200)
     res.header('Content-Type', 'text/javascript')
-    res.send(output)
+    res.send(outputCode)
   })
 
   const defaultResponse = {
@@ -150,7 +162,12 @@ export const dev = async (options: ResolvedOptions) => {
 
   // app.use('/', proxy(`${info.address}:${info.port}`))
 
-  await killPort(port)
+  await Promise.race([
+    killPort(port),
+    // only dev mode...
+    new Promise((res) => setTimeout(res, 200)),
+  ])
+
   app.listen(port)
 
   // eslint-disable-next-line no-console

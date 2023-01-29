@@ -4,6 +4,10 @@
 // rollup config for react native
 // https://gist.github.com/pritishvaidya/171dcb8e857ec1df186c035c3df6ae16
 
+import { esbuildFlowPlugin } from '@bunchtogether/vite-plugin-flow'
+import { esbuildCommonjs } from '@originjs/vite-plugin-commonjs'
+import rollupCommonJs from '@rollup/plugin-commonjs'
+import flowRemoveTypes from 'flow-remove-types'
 import micromatch from 'micromatch'
 import { OutputAsset, OutputChunk, OutputOptions } from 'rollup'
 import { Plugin } from 'vite'
@@ -43,8 +47,11 @@ const warnNotInlined = (filename: string) =>
 export function nativePlugin(): Plugin {
   return {
     name: 'vite:singlefile',
+
     config: (config) => {
       if (!config.build) config.build = {}
+
+      config.build.modulePreload = { polyfill: false }
       // Ensures that even very large assets are inlined in your JavaScript.
       config.build.assetsInlineLimit = 100000000
       // Avoid warnings about large chunks.
@@ -56,8 +63,137 @@ export function nativePlugin(): Plugin {
       // Subfolder bases are not supported, and shouldn't be needed because we're embedding everything.
       config.base = undefined
 
-      if (!config.build.rollupOptions) config.build.rollupOptions = {}
-      if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {}
+      const extensions = [
+        '.ios.js',
+        '.native.js',
+        '.native.ts',
+        '.native.tsx',
+        '.js',
+        '.jsx',
+        '.json',
+        '.ts',
+        '.tsx',
+        '.mjs',
+      ]
+
+      config.resolve ??= {}
+
+      config.resolve.extensions = extensions
+
+      config.resolve.alias ??= {}
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'react-native/Libraries/Renderer/shims/ReactFabric':
+          'react-native/Libraries/Renderer/shims/ReactFabric',
+        'react-native/Libraries/Utilities/codegenNativeComponent':
+          'react-native/Libraries/Utilities/codegenNativeComponent',
+        'react-native-svg': 'react-native-svg',
+        'react-native-web': 'react-native',
+        'react-native': 'react-native',
+      }
+
+      config.optimizeDeps ??= {}
+      config.optimizeDeps.esbuildOptions ??= {}
+      config.optimizeDeps.esbuildOptions.resolveExtensions = extensions
+
+      config.optimizeDeps.esbuildOptions.plugins ??= []
+      config.optimizeDeps.esbuildOptions.plugins.push(
+        esbuildFlowPlugin(
+          /node_modules\/(react-native\/|@react-native\/assets)/,
+          (_) => 'jsx'
+        )
+      )
+      config.optimizeDeps.esbuildOptions.plugins.push(esbuildCommonjs(['react-native']))
+
+      config.optimizeDeps.esbuildOptions.plugins.push({
+        name: `testing`,
+        setup(build) {
+          build.onResolve(
+            {
+              filter: /\react-native\//,
+            },
+            async ({ path, namespace }) => {
+              console.log('rn?', path)
+              return {
+                path: '',
+                external: true,
+              }
+            }
+          )
+        },
+      })
+
+      config.optimizeDeps.include ??= []
+      config.optimizeDeps.include.push('react-native')
+
+      config.optimizeDeps.esbuildOptions.loader ??= {}
+      config.optimizeDeps.esbuildOptions.loader['.js'] = 'jsx'
+
+      config.optimizeDeps.esbuildOptions.plugins.push({
+        name: 'react-native-assets',
+        setup(build) {
+          build.onResolve(
+            {
+              filter: /\.(png|jpg|gif|webp)$/,
+            },
+            async ({ path, namespace }) => {
+              return {
+                path: '',
+                external: true,
+              }
+            }
+          )
+        },
+      })
+
+      config.build.rollupOptions ??= {}
+
+      config.build.rollupOptions.input =
+        '/Users/n8/tamagui/apps/kitchen-sink/src/index.tsx'
+
+      config.build.rollupOptions.output ??= {}
+
+      config.build.rollupOptions.plugins ??= []
+
+      console.log('wtf', config.build.rollupOptions.plugins)
+
+      if (Array.isArray(config.build.rollupOptions.plugins)) {
+        config.build.rollupOptions.plugins.push({
+          name: `??`,
+
+          resolveId: {
+            order: 'pre',
+            handler(source) {
+              if (source === 'react-native' || source.startsWith('react-native/')) {
+                return { id: source, external: true }
+              }
+              return null
+            },
+          },
+
+          // load(id) {
+          //   console.log('load', id)
+          //   if (id.includes('/react-native/')) {
+          //     // const transformed = flowRemoveTypes(code, {})
+          //     // return { code: transformed.toString(), map: transformed.generateMap() }
+          //   }
+          // },
+
+          // transform(code, id) {
+          //   // somehow disablinfg index.html with this fixes things?
+          //   console.log('hi', id)
+          //   // const transformed = flowRemoveTypes(code, {})
+          //   // return { code: transformed.toString(), map: transformed.generateMap() }
+          //   return {
+          //     code,
+          //     map: null as any,
+          //   }
+          // },
+        })
+
+        // config.build.rollupOptions.plugins.push(rollupCommonJs())
+        // config.build.rollupOptions.plugins.push(viteCommonjs())
+      }
 
       const updateOutputOptions = (out: OutputOptions) => {
         // Ensure that as many resources as possible are inlined.
